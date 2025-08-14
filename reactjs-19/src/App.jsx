@@ -4,29 +4,6 @@ import Search from "./components/Search";
 import Spinner from "./components/Spinner";
 import MovieCard from "./components/MovieCard";
 
-const Card = ({ title }) => {
-  const [count, setCount] = useState(0);
-  const [hasLiked, setHasLiked] = useState(false);
-
-  const handleLike = () => {
-    setHasLiked(!hasLiked);
-  };
-
-  useEffect(() => {
-    console.log(`Card with title "${title}" has been liked ${count} times.`);
-  }, [hasLiked]);
-
-  return (
-    <div className="card" onClick={() => setCount(count + 1)}>
-      <h2>
-        {title} <br /> {count || null}
-      </h2>
-
-      <button onClick={handleLike}>{hasLiked ? "❤️" : "🤍"}</button>
-    </div>
-  );
-};
-
 const API_BASE_URL = "https://api.themoviedb.org/3";
 const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 const API_OPTIONS = {
@@ -37,17 +14,36 @@ const API_OPTIONS = {
   },
 };
 
+function useDebounce(cb, delay) {
+  const [debounceValue, setDebounceValue] = useState(cb);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebounceValue(cb);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [cb, delay]);
+  return debounceValue;
+}
+
 const App = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [movies, setMovies] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchMovies = async () => {
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
+  const fetchMovies = async (query = "") => {
     setIsLoading(true);
     setErrorMessage("");
     try {
-      const endpoint = `${API_BASE_URL}/discover/movie?sort_by=popularity.desc`;
+      const endpoint =
+        query?.length > 2
+          ? `${API_BASE_URL}/search/movie?query=${encodeURIComponent(query)}`
+          : `${API_BASE_URL}/discover/movie?sort_by=popularity.desc`;
       const response = await fetch(endpoint, API_OPTIONS);
 
       if (!response.ok) {
@@ -72,8 +68,8 @@ const App = () => {
   };
 
   useEffect(() => {
-    fetchMovies();
-  }, []);
+    fetchMovies(debouncedSearchTerm);
+  }, [debouncedSearchTerm]);
 
   return (
     <main className="card-container">
@@ -86,6 +82,10 @@ const App = () => {
             Without the Hassle
           </h1>
         </header>
+
+        <section className="mb-8">
+          <Search searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
+        </section>
 
         <section className="all-movies">
           <h2>All Movies</h2>
@@ -105,7 +105,6 @@ const App = () => {
             <p className="text-white">No movies found</p>
           )}
         </section>
-        <Search searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
       </div>
     </main>
   );
